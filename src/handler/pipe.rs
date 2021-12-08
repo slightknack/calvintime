@@ -6,13 +6,36 @@ use wasi_common::{Error, ErrorExt, SystemTimeSpec};
 use std::any::Any;
 
 /// A general-purpose pipe that can be read from, written to, or both.
+/// When you write some data to it, it will process the data and pump the result to read
 #[derive(Clone)]
 pub struct Handler {
     read: Option<Arc<RwLock<Box<dyn Read>>>>,
     write: Option<Arc<RwLock<Box<dyn Write>>>>,
 }
 
+
 impl Handler {
+    pub fn new<T>(
+        shared_state: Arc<RwLock<T>>,
+        handler: Box<dyn Fn(T, ) -> T>,
+    ) -> Self {
+        todo!()
+    }
+
+    pub fn new_nonsense() -> Self {
+        Handler {
+            read:  Some(Arc::new(RwLock::new(Box::new("Hello Read".as_bytes())))),
+            write: Some(Arc::new(RwLock::new(Box::new(io::sink())))),
+        }
+    }
+
+    pub fn new_shared_state<T>(
+        shared_state: Arc<RwLock<T>>,
+        stepper: Box<dyn Fn(T, &mut dyn Read, &mut dyn Write) -> T>,
+    ) -> Handler {
+        todo!()
+    }
+
     /// Returns whether the given permissions match the abilities of the handler.
     /// For example, a `Read` handle can't be written to.
     /// In addition, a `ReadWrite` handle is also a valid read-only handle.

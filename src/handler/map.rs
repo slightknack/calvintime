@@ -9,8 +9,17 @@ use wasi_common::{Error, ErrorExt, SystemTimeSpec};
 
 use super::Handler;
 
+pub type HandlerMapInner = HashMap<&'static str, Handler>;
+
 pub struct HandlerMap {
-    map: Arc<HashMap<&'static str, Handler>>,
+    map: Arc<HandlerMapInner>,
+}
+
+impl From<HandlerMapInner> for HandlerMap {
+    fn from(map: HandlerMapInner) -> Self {
+        let map = Arc::new(map);
+        HandlerMap { map }
+    }
 }
 
 unsafe impl Send for Handler {}
