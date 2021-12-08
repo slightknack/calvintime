@@ -3,6 +3,7 @@ use wasmtime_wasi::sync::WasiCtxBuilder;
 use wasi_common::pipe::ReadPipe;
 
 pub mod plugin;
+pub mod handler;
 
 fn main() {
     let engine = wt::Engine::default();
