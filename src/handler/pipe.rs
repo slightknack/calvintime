@@ -10,6 +10,7 @@ use std::any::Any;
 use std::path::PathBuf;
 use super::ReadWrite;
 
+#[derive(Clone)]
 pub enum Handler {
     Read(Arc<RwLock<dyn Read>>),
     Write(Arc<RwLock<dyn Write>>),

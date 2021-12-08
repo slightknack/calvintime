@@ -41,7 +41,7 @@ impl WasiDir for HandlerMap {
             Err(Error::invalid_argument())?
         }
 
-        Ok(Box::new(*handler.clone()))
+        Ok(Box::new(handler.clone()))
     }
 
     async fn open_dir(&self, _symlink_follow: bool, _path: &str) -> Result<Box<dyn WasiDir>, Error> {
