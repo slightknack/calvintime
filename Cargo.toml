@@ -1,0 +1,10 @@
+[package]
+name = "calvintime"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+wasmtime = "0.31"
+wasmtime-wasi = "0.31"
+wasi-common = "0.31"
+wiggle = "0.31"
