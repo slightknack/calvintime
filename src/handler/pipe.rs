@@ -9,10 +9,9 @@ use std::any::Any;
 /// When you write some data to it, it will process the data and pump the result to read
 #[derive(Clone)]
 pub struct Handler {
-    read: Option<Arc<RwLock<Box<dyn Read>>>>,
-    write: Option<Arc<RwLock<Box<dyn Write>>>>,
+    to_process: Vec<u8>,
+    processor:  Arc<dyn FnMut(Vec<u8>) -> Result<Vec<u8>, ()>>
 }
-
 
 impl Handler {
     pub fn new<T>(
@@ -24,8 +23,8 @@ impl Handler {
 
     pub fn new_nonsense() -> Self {
         Handler {
-            read:  Some(Arc::new(RwLock::new(Box::new("Hello Read".as_bytes())))),
-            write: Some(Arc::new(RwLock::new(Box::new(io::sink())))),
+            to_process: "Hello Read".as_bytes().to_vec(),
+            processor:  Arc::new(|inp, out| { out = &mut inp; Ok(()) } ),
         }
     }
 
@@ -36,33 +35,33 @@ impl Handler {
         todo!()
     }
 
-    /// Returns whether the given permissions match the abilities of the handler.
-    /// For example, a `Read` handle can't be written to.
-    /// In addition, a `ReadWrite` handle is also a valid read-only handle.
-    pub fn is_valid(&self, read: bool, write: bool) -> bool {
-        match (self.read.is_some(), self.write.is_some()) {
-            (true, true) => true,
-            (true, _) => !write,
-            (_, true) => !read,
-            _ => false,
-        }
-    }
+    // /// Returns whether the given permissions match the abilities of the handler.
+    // /// For example, a `Read` handle can't be written to.
+    // /// In addition, a `ReadWrite` handle is also a valid read-only handle.
+    // pub fn is_valid(&self, read: bool, write: bool) -> bool {
+    //     match (self.read.is_some(), self.write.is_some()) {
+    //         (true, true) => true,
+    //         (true, _) => !write,
+    //         (_, true) => !read,
+    //         _ => false,
+    //     }
+    // }
 
-    fn borrow_read(&self) -> Option<std::sync::RwLockWriteGuard<Box<dyn Read + 'static>>> {
-        if let Some(ref r) = self.read {
-            RwLock::write(&r).ok()
-        } else {
-            None
-        }
-    }
-
-    fn borrow_write(&self) -> Option<std::sync::RwLockWriteGuard<Box<dyn Write + 'static>>> {
-        if let Some(ref w) = self.write {
-            RwLock::write(&w).ok()
-        } else {
-            None
-        }
-    }
+    // fn borrow_read(&self) -> Option<std::sync::RwLockWriteGuard<Box<dyn Read + 'static>>> {
+    //     if let Some(ref r) = self.read {
+    //         RwLock::write(&r).ok()
+    //     } else {
+    //         None
+    //     }
+    // }
+    //
+    // fn borrow_write(&self) -> Option<std::sync::RwLockWriteGuard<Box<dyn Write + 'static>>> {
+    //     if let Some(ref w) = self.write {
+    //         RwLock::write(&w).ok()
+    //     } else {
+    //         None
+    //     }
+    // }
 }
 
 #[wiggle::async_trait]
@@ -84,13 +83,9 @@ impl WasiFile for Handler {
         Ok(FileType::Pipe)
     }
 
-    /// Returns `APPEND` if this pipe is write-able
+    /// Returns `APPEND`
     async fn get_fdflags(&self) -> Result<FdFlags, Error> {
-        if self.write.is_some() {
-            Ok(FdFlags::APPEND)
-        } else {
-            Ok(FdFlags::empty())
-        }
+        Ok(FdFlags::APPEND)
     }
 
     /// This pipe is fixed, you can't change it!
@@ -130,12 +125,10 @@ impl WasiFile for Handler {
 
     /// Reads from the slice if possible.
     async fn read_vectored<'a>(&self, bufs: &mut [io::IoSliceMut<'a>]) -> Result<u64, Error> {
-        if let Some(mut r) = self.borrow_read() {
-            let n = r.read_vectored(bufs)?;
-            Ok(n.try_into()?)
-        } else {
-            Err(Error::badf())
-        }
+        let to_process = std::mem::replace(&mut self.to_process, vec![]);
+        let processed = (self.processor)(to_process).or_else(|_| Err(Error::invalid_argument()))?;
+        let n = (&processed as &[u8]).read_vectored(bufs)?;
+        Ok(n.try_into()?)
     }
 
     /// Can only read off the top.
@@ -149,12 +142,9 @@ impl WasiFile for Handler {
 
     /// Writes to the buffer if applicable.
     async fn write_vectored<'a>(&self, bufs: &[io::IoSlice<'a>]) -> Result<u64, Error> {
-        if let Some(mut w) = self.borrow_write() {
-            let n = w.write_vectored(bufs)?;
-            Ok(n.try_into()?)
-        } else {
-            Err(Error::badf())
-        }
+        // TODO: fix
+        let n = (&self.to_process as &mut [u8]).write_vectored(&bufs)?;
+        Ok(n.try_into()?)
     }
 
     /// Can only read to the top.
