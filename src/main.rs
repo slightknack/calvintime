@@ -1,4 +1,4 @@
-use wasmtime::{self as wt};
+use wasmtime as wt;
 use wasmtime_wasi::sync::WasiCtxBuilder;
 use wasi_common::pipe::ReadPipe;
 

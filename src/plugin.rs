@@ -1,7 +1,3 @@
-use std::collections::HashMap;
-use std::io::{self, Read, Write};
-use std::sync::{Arc, RwLock};
-use wasi_common::pipe::{ReadPipe, WritePipe};
 use crate::handler::HandlerMap;
 
 pub trait Plugin: Send + Sync + std::fmt::Debug {
