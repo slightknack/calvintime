@@ -1,5 +1,10 @@
+use std::io::prelude::*;
+
 fn main() {
-    let file = std::fs::read_to_string("counter/incr").unwrap();
-    println!("{}", file);
-    println!("The number is: {}", 1 + 1)
+    let mut file = std::fs::File::open("counter/incr").unwrap();
+    file.write_all(b" - And this too!");
+    let mut contents = String::new();
+    file.read_to_string(&mut contents);
+    println!("{}", contents);
+    println!("The number is: {}", 1 + 3)
 }

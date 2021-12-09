@@ -1,38 +1,38 @@
 use std::convert::TryInto;
 use std::io::{self, Read, Write};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, Mutex};
 use wasi_common::file::{Advice, FdFlags, FileType, Filestat, WasiFile};
 use wasi_common::{Error, ErrorExt, SystemTimeSpec};
 use std::any::Any;
+
+pub type HandlerFn = dyn Fn(Vec<u8>) -> Result<Vec<u8>, ()> + Send + Sync;
 
 /// A general-purpose pipe that can be read from, written to, or both.
 /// When you write some data to it, it will process the data and pump the result to read
 #[derive(Clone)]
 pub struct Handler {
-    to_process: Vec<u8>,
-    processor:  Arc<dyn FnMut(Vec<u8>) -> Result<Vec<u8>, ()>>
+    to_process: Arc<Mutex<Vec<u8>>>,
+    processor:  Arc<HandlerFn>,
 }
 
 impl Handler {
     pub fn new<T>(
-        shared_state: Arc<RwLock<T>>,
-        handler: Box<dyn Fn(T, ) -> T>,
+        handler: Arc<HandlerFn>,
     ) -> Self {
-        todo!()
-    }
-
-    pub fn new_nonsense() -> Self {
         Handler {
-            to_process: "Hello Read".as_bytes().to_vec(),
-            processor:  Arc::new(|inp, out| { out = &mut inp; Ok(()) } ),
+            to_process: Arc::new(Mutex::new(vec![])),
+            processor:  handler,
         }
     }
 
-    pub fn new_shared_state<T>(
-        shared_state: Arc<RwLock<T>>,
-        stepper: Box<dyn Fn(T, &mut dyn Read, &mut dyn Write) -> T>,
+    pub fn new_shared_state(
+        shared_state: Arc<Mutex<Vec<u8>>>,
+        handler: Arc<HandlerFn>,
     ) -> Handler {
-        todo!()
+        Handler {
+            to_process: shared_state,
+            processor:  handler
+        }
     }
 
     // /// Returns whether the given permissions match the abilities of the handler.
@@ -125,8 +125,9 @@ impl WasiFile for Handler {
 
     /// Reads from the slice if possible.
     async fn read_vectored<'a>(&self, bufs: &mut [io::IoSliceMut<'a>]) -> Result<u64, Error> {
-        let to_process = std::mem::replace(&mut self.to_process, vec![]);
-        let processed = (self.processor)(to_process).or_else(|_| Err(Error::invalid_argument()))?;
+        let mut data = self.to_process.lock().unwrap();
+        let processed = (self.processor)(data.drain(..).collect())
+            .or_else(|_| Err(Error::invalid_argument()))?;
         let n = (&processed as &[u8]).read_vectored(bufs)?;
         Ok(n.try_into()?)
     }
@@ -143,7 +144,8 @@ impl WasiFile for Handler {
     /// Writes to the buffer if applicable.
     async fn write_vectored<'a>(&self, bufs: &[io::IoSlice<'a>]) -> Result<u64, Error> {
         // TODO: fix
-        let n = (&self.to_process as &mut [u8]).write_vectored(&bufs)?;
+        let mut data = self.to_process.lock().unwrap();
+        let n = data.write_vectored(&bufs)?;
         Ok(n.try_into()?)
     }
 

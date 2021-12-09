@@ -22,11 +22,6 @@ impl From<HandlerMapInner> for HandlerMap {
     }
 }
 
-unsafe impl Send for Handler {}
-unsafe impl Send for HandlerMap {}
-unsafe impl Sync for Handler {}
-unsafe impl Sync for HandlerMap {}
-
 #[wiggle::async_trait]
 impl WasiDir for HandlerMap {
     fn as_any(&self) -> &dyn Any {
@@ -40,16 +35,11 @@ impl WasiDir for HandlerMap {
         _symlink_follow: bool,
         path: &str,
         _oflags: OFlags,
-        read: bool,
-        write: bool,
+        _read: bool,
+        _write: bool,
         _fdflags: FdFlags,
     ) -> Result<Box<dyn WasiFile>, Error> {
         let handler = self.map.get(path).ok_or_else(|| Error::not_found())?;
-        if !handler.is_valid(read, write) {
-            // is this the best one?
-            Err(Error::invalid_argument())?
-        }
-
         Ok(Box::new(handler.clone()))
     }
 

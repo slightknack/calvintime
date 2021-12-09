@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex};
 use crate::handler::{Handler, HandlerMap};
 
 pub trait Plugin: Send + Sync + std::fmt::Debug {
@@ -21,10 +21,12 @@ impl Plugin for Counter {
     fn name() -> &'static str { "counter" }
 
     fn api() -> HandlerMap {
-        let mut state = Arc::new(RwLock::new(0));
         let mut map = HashMap::new();
         // map.insert("incr", Handler::new(state.clone(), |t: Self::State| t + 1));
-        map.insert("incr", Handler::new_nonsense());
+        map.insert("incr", Handler::new_shared_state(
+            Arc::new(Mutex::new("Hello Mother".as_bytes().to_vec())),
+            Arc::new(|echo| Ok(echo))
+        ));
         return map.into();
     }
 }
