@@ -144,6 +144,7 @@ impl WasiFile for Handler {
     /// Writes to the buffer if applicable.
     async fn write_vectored<'a>(&self, bufs: &[io::IoSlice<'a>]) -> Result<u64, Error> {
         // TODO: fix
+        println!("{:?}", bufs);
         let mut data = self.to_process.lock().unwrap();
         let n = data.write_vectored(&bufs)?;
         Ok(n.try_into()?)
@@ -155,6 +156,7 @@ impl WasiFile for Handler {
         _bufs: &[io::IoSlice<'a>],
         _offset: u64,
     ) -> Result<u64, Error> {
+        println!("banana");
         Err(Error::badf())
     }
 
